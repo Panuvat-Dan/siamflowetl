@@ -143,7 +143,7 @@ class DimensionalModelSuggester:
         metadata.create_all(engine)
         with open(output_file, 'w') as f:
             for table in tables:
-                f.write(str(table.compile(engine)) + ";\n")
+                f.write(str(table.compile(dialect=engine.dialect)) + ";\n")
 
 if __name__ == "__main__":
     schema = {

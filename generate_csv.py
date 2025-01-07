@@ -21,4 +21,4 @@ data = {
 df = pd.DataFrame(data, columns=columns)
 
 # Save to CSV
-df.to_csv("/C:/Users/sam/Desktop/siamflowetl/data/input/input.csv", index=False)
+df.to_csv("C:\\Users\\sam\\Desktop\\siamflowetl\\data\\input\\input.csv", index=False)

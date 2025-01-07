@@ -28,12 +28,12 @@ class QualityHandler:
 
     def validate_schema(self, df, expected_schema):
         if isinstance(df, pd.DataFrame):
-            actual_schema = df.dtypes.to_dict()
+            actual_columns = df.columns.tolist()
         else:
-            actual_schema = dict(df.dtypes)
-        for column, dtype in expected_schema.items():
-            if column not in actual_schema or actual_schema[column] != dtype:
-                raise ValueError(f"Schema mismatch for column {column}: expected {dtype}, found {actual_schema.get(column)}")
+            actual_columns = df.columns
+        for column in expected_schema:
+            if column not in actual_columns:
+                raise ValueError(f"Schema mismatch: expected column {column} not found")
 
     def validate_no_duplicates(self, df, column_name):
         if isinstance(df, pd.DataFrame):
@@ -66,9 +66,9 @@ if __name__ == "__main__":
     #except ValueError as e:
     #    errors.append(str(e))
     #
-    #expected_schema = {"id": "float64", "calories": "int64", "duration": "int64", "target": "int64"}
+    #expected_columns = ["id", "calories", "duration", "target"]
     #try:
-    #    quality_handler.validate_schema(df, expected_schema)
+    #    quality_handler.validate_schema(df, expected_columns)
     #except ValueError as e:
     #    errors.append(str(e))
     #
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     except ValueError as e:
         errors.append(str(e))
     
-    expected_schema = {"id": "bigint", "calories": "bigint", "duration": "bigint", "target": "bigint"}
+    expected_schema = ["id", "calories", "duration", "target"]
     try:
         quality_handler.validate_schema(spark_df, expected_schema)
     except ValueError as e:
