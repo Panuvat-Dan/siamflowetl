@@ -86,35 +86,11 @@ if __name__ == "__main__":
     # Example csv to parquet
     ingestion = IngestionHandler()
     ingestion.ingest(
-        source="data/input.csv",
+        source="data/input/input.csv",
         source_format="csv",
-        target="data/output.parquet",
+        target="data/output/output.parquet",
         target_format="parquet",
         write_mode="overwrite"
-    )
-    # Example json to table
-    ingestion.ingest(
-        source="data/input.json",
-        source_format="json",
-        target="my_table",
-        target_format="table",
-        write_mode="append",
-        url="jdbc:mysql://localhost:3306/mydb",
-        driver="com.mysql.cj.jdbc.Driver",
-        user="root",
-        password="password"
-    )
-    # Example table to csv
-    ingestion.ingest(
-        source="my_table",
-        source_format="table",
-        target="data/output.csv",
-        target_format="csv",
-        write_mode="overwrite",
-        url="jdbc:mysql://localhost:3306/mydb",
-        driver="com.mysql.cj.jdbc.Driver",
-        user="root",
-        password="password"
     )
 
 
