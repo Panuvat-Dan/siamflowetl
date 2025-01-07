@@ -1,49 +1,44 @@
-import pandas as pd
-import pyspark
 from pyspark.sql import SparkSession
-from siametl.logging import Logger
-from siametl.quality import DataQuality
-from .logging import LoggingHandler
+import pandas as pd
 from .quality import QualityHandler
 
-class ReadHandler:
-    def __init__(self, spark):
-        self.spark = spark
+class IngestionHandler:
+    def __init__(self, spark_app_name="IngestionApp", spark_master="local[*]"):
+        self.spark = SparkSession.builder \
+            .appName(spark_app_name) \
+            .master(spark_master) \
+            .getOrCreate()
+        self.quality = QualityHandler()
 
-    def read(self, source, source_format, engine="spark", **kwargs):
-        if source_format.lower() == "csv":
-            if engine == "pandas":
+    def read_data(self, source, source_format, engine="pandas", **kwargs):
+        if engine == "pandas":
+            if source_format.lower() == "csv":
                 return pd.read_csv(source, **kwargs)
-            elif engine == "spark":
-                return self.spark.read.csv(source, header=True, inferSchema=True, **kwargs)
-        elif source_format.lower() == "excel":
-            if engine == "pandas":
-                return pd.read_excel(source, **kwargs)
-            elif engine == "spark":
-                return self.spark.read.format("com.crealytics.spark.excel").option("header", "true").load(source, **kwargs)
-        elif source_format.lower() == "json":
-            if engine == "pandas":
+            elif source_format.lower() == "json":
                 return pd.read_json(source, **kwargs)
-            elif engine == "spark":
-                return self.spark.read.json(source, **kwargs)
-        elif source_format.lower() == "parquet":
-            if engine == "pandas":
-                return pd.read_parquet(source, engine="pyarrow", **kwargs)
-            elif engine == "spark":
-                return self.spark.read.parquet(source, **kwargs)
-        elif source_format.lower() == "table":
-            if engine == "pandas":
+            elif source_format.lower() == "parquet":
+                return pd.read_parquet(source,engine = "pyarrow", **kwargs) # pandas need extension engine to read parquet
+            elif source_format.lower() == "table":
                 return pd.read_sql_table(source, **kwargs)
-            elif engine == "spark":
-                return self.spark.read.format("jdbc").options(**kwargs).load()
+            elif source_format.lower() == "xlsx":
+                return pd.read_excel(source, **kwargs)
+            else:
+                raise ValueError("Unsupported source format. Supported formats: 'csv', 'json', 'parquet', 'table', 'xlsx'.")
+        elif engine == "spark":
+            if source_format.lower() == "csv":
+                return self.spark.read.csv(source, **kwargs)
+            elif source_format.lower() == "json":
+                return self.spark.read.json(source, **kwargs)
+            elif source_format.lower() == "parquet":
+                return self.spark.read.parquet(source, **kwargs)
+            elif source_format.lower() == "table":
+                return self.spark.read.table(source, **kwargs)
+            else:
+                raise ValueError("Unsupported source format for Spark. Supported formats: 'csv', 'json', 'parquet', 'table'.")
         else:
-            raise ValueError("Unsupported source format. Supported formats: 'csv', 'excel', 'json', 'parquet', 'table'.")
+            raise ValueError("Unsupported engine. Supported engines: 'spark', 'pandas'.")
 
-class WriteHandler:
-    def __init__(self, spark):
-        self.spark = spark
-
-    def write(self, data, target, target_format, write_mode="overwrite", engine="spark", **kwargs):
+    def write_data(self, data, target, target_format, engine="pandas", write_mode="overwrite", **kwargs):
         if engine == "pandas":
             if target_format.lower() == "csv":
                 data.to_csv(target, mode=write_mode, **kwargs)
@@ -71,30 +66,21 @@ class WriteHandler:
         else:
             raise ValueError("Unsupported engine. Supported engines: 'spark', 'pandas'.")
 
-class IngestionHandler:
-    def __init__(self, spark_app_name="IngestionApp", spark_master="local[*]"):
-        self.spark = SparkSession.builder \
-            .appName(spark_app_name) \
-            .master(spark_master) \
-            .getOrCreate()
-        self.reader = ReadHandler(self.spark)
-        self.writer = WriteHandler(self.spark)
-        self.logger = LoggingHandler()
-        self.quality = QualityHandler()
-
-    def ingest(self, source, source_format, target, target_format, write_mode="overwrite", engine="spark", **kwargs):
-        self.logger.log_info(f"Ingestion started for source: {source} to target: {target}")
+    def process_data(self, source, source_format, target, target_format, engine="pandas", read_kwargs={}, write_kwargs={}):
         try:
-            data = self.reader.read(source, source_format, engine, **kwargs)
-            stage_target = f"stage_{target}"
-            self.writer.write(data, stage_target, target_format, write_mode, engine, **kwargs)
-            self.quality.validate_no_nulls(data, "column_name")
-            self.quality.validate_threshold(data, "column_name", threshold=0.1)
-            self.writer.write(data, target, target_format, write_mode, engine, **kwargs)
-            self.logger.log_info(f"Ingestion completed for source: {source} to target: {target}")
+            self.logger.log_info(f"Reading data from source {source}, source format {source_format}...................")
+            data = self.read_data(source, source_format, engine, **read_kwargs)
+            
+            self.logger.log_info("Validating data quality...................")
+            self.quality.validate_no_nulls(data, "primary_key_column")  # Replace with actual primary key column
+            self.quality.validate_threshold(data, "column_name")  # Replace with actual column name
+            
+            self.logger.log_info(f"Writing data to target {target}...................")
+            self.write_data(data, target, target_format, engine, **write_kwargs)
+            self.logger.log_info("Data ingestion completed successfully!")
         except Exception as e:
-            self.logger.log_error(f"Ingestion failed for source: {source} to target: {target} with error: {e}")
-            raise e
+            self.logger.log_error(f"Data ingestion failed: {e} !")
+            raise
 
 if __name__ == "__main__":
     # Example csv to parquet
